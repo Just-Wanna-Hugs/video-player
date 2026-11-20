@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Unbounded:wght@500;700&display=swap">
+<title>Видеоплеер по ссылке</title>
+<style>
+  /* Макет: шапка с логотипом, строка вставки ссылки, сцена 16:9, ниже сетка карточек с превью.
+     Акцент один (бирюзовый). Цвета платформ служат только метками. */
+  :root {
+    --bg: #eef2f3;
+    --surface: #ffffff;
+    --surface-2: #e2e9eb;
+    --fg: #11181b;
+    --muted: #566468;
+    --line: #cbd6d9;
+    --accent: #0f766e;
+    --accent-fg: #ffffff;
+    --danger: #b42323;
+    --shadow: 0 10px 30px rgba(17, 24, 27, 0.10);
+    --yt: #d92d2d;
+    --rt: #1b6fc2;
+    --x: #222a2e;
+    --font-body: "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-head: "Unbounded", "Onest", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1113;
+      --surface: #151b1e;
+      --surface-2: #1d2529;
+      --fg: #e8eef0;
+      --muted: #93a2a8;
+      --line: #2a353a;
+      --accent: #3dd6c0;
+      --accent-fg: #06201c;
+      --danger: #ff8d8d;
+      --shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+      --yt: #ff6b6b;
+      --rt: #6cb4ff;
+      --x: #dfe6e9;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1113;
+    --surface: #151b1e;
+    --surface-2: #1d2529;
+    --fg: #e8eef0;
+    --muted: #93a2a8;
+    --line: #2a353a;
+    --accent: #3dd6c0;
+    --accent-fg: #06201c;
+    --danger: #ff8d8d;
+    --shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+    --yt: #ff6b6b;
+    --rt: #6cb4ff;
+    --x: #dfe6e9;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.5;
+    padding-block: 20px 56px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+  /* шапка */
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .logo {
+    width: 36px; height: 36px; flex: none; border-radius: 11px;
+    background: var(--accent); color: var(--accent-fg);
+    display: grid; place-items: center;
+  }
+  h1 { font-family: var(--font-head); font-weight: 700; font-size: 1.15rem; letter-spacing: -0.01em; margin: 0; }
+  .sources { display: flex; gap: 6px 14px; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted); }
+  .sources span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; background: var(--muted); }
+  .dot.yt { background: var(--yt); } .dot.rt { background: var(--rt); } .dot.x { background: var(--x); }
+
+  /* строка вставки */
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; }
+  .field { position: relative; min-width: 0; }
+  .field.url { flex: 1 1 300px; }
+  .field.narrow { flex: 0 1 210px; }
+  input[type="text"] {
+    width: 100%; min-height: 48px;
+    font: inherit; color: var(--fg);
+    padding: 0 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .field.url input { padding-right: 132px; }
+  input[type="text"]::placeholder { color: var(--muted); }
+  input[type="text"]:focus { border-color: var(--accent); }
+  .detect {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 999px;
+    background: var(--surface-2); font-size: 0.75rem; color: var(--fg);
+    pointer-events: none; max-width: 120px; white-space: nowrap;
+  }
+  button {
+    font: inherit; cursor: pointer;
+    min-height: 48px; padding: 0 18px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--surface); color: var(--fg);
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 600; }
+  button:hover { border-color: var(--accent); }
+  button.primary:hover { filter: brightness(1.08); }
+  button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .msg { min-height: 1.3em; font-size: 0.9rem; color: var(--muted); margin: -8px 0 0; }
+  .msg.error { color: var(--danger); }
+  .msg:empty { display: none; }
+
+  /* сцена */
+  .stage { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
+  .frame { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; background: #000; }
+  .frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .frame.tweet { aspect-ratio: auto; min-height: 220px; background: var(--surface); display: flex; justify-content: center; padding: 16px; }
+  .frame.tweet > div { width: 100%; max-width: 550px; }
+  .empty {
+    aspect-ratio: 16 / 9; max-height: 420px; width: 100%;
+    display: grid; place-content: center; justify-items: center; gap: 14px;
+    text-align: center; padding: 24px; color: var(--muted);
+    background: var(--surface-2);
+  }
+  .empty .ring { width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; color: var(--accent); background: var(--surface); }
+  .empty p { margin: 0; max-width: 36ch; text-wrap: balance; }
+  .now { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--line); font-size: 0.9rem; }
+  .now .src { display: inline-flex; align-items: center; gap: 8px; min-width: 0; font-weight: 500; }
+  .now a { color: var(--accent); overflow-wrap: anywhere; }
+
+  /* библиотека */
+  section h2 { font-family: var(--font-head); font-weight: 500; font-size: 0.95rem; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px 16px; flex-wrap: wrap; }
+  .tools { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tools button { min-height: 34px; padding: 0 12px; font-size: 0.8rem; color: var(--muted); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 14px; }
+  .chip { min-height: 34px; padding: 0 14px; border-radius: 999px; font-size: 0.85rem; }
+  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 600; }
+
+  ul.history { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 14px; }
+  ul.history li { position: relative; display: flex; flex-direction: column; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  ul.history li:hover { border-color: var(--accent); }
+  .open { display: flex; flex-direction: column; align-items: stretch; width: 100%; min-height: 0; padding: 0; border: 0; border-radius: 0; background: none; text-align: left; color: inherit; }
+  .thumb { position: relative; aspect-ratio: 16 / 9; display: grid; place-items: center; overflow: hidden; background: var(--surface-2); }
+  .thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .thumb .glyph { font-family: var(--font-head); font-weight: 700; font-size: 1rem; color: var(--muted); }
+  .tag { position: absolute; left: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 999px; font-size: 0.7rem; font-weight: 500; background: var(--surface); color: var(--fg); }
+  .meta { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .t { font-size: 0.9rem; font-weight: 500; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .p { font-size: 0.75rem; color: var(--muted); }
+  .p:empty { display: none; }
+  .acts { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; }
+  .acts .del { width: 30px; height: 30px; min-height: 0; padding: 0; border-radius: 8px; font-size: 0.8rem; background: var(--surface); color: var(--muted); }
+  .editrow { display: flex; flex-direction: column; gap: 6px; padding: 12px; }
+  .editrow input { min-height: 38px; }
+  .editrow .btns { display: flex; gap: 6px; }
+  .editrow button { min-height: 38px; flex: 1; padding: 0 10px; }
+  .hint { font-size: 0.85rem; color: var(--muted); margin: 0; max-width: 70ch; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    button, input, ul.history li { transition: border-color 0.15s, background-color 0.15s; }
+  }
+  @media (max-width: 480px) {
+    .field.narrow { flex: 1 1 100%; }
+    .field.url input { padding-right: 14px; }
+    .detect { position: static; transform: none; margin-top: 6px; display: inline-flex; }
+    .field.url { display: flex; flex-direction: column; align-items: flex-start; }
+    ul.history { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
+      <h1>Видеоплеер</h1>
+    </div>
+    <div class="sources" aria-label="Поддерживаемые сайты">
+      <span><i class="dot yt"></i>YouTube</span>
+      <span><i class="dot rt"></i>RuTube</span>
+      <span><i class="dot x"></i>X (Twitter)</span>
+    </div>
+  </header>
+
+  <form id="form" class="bar" autocomplete="off">
+    <div class="field url">
+      <input id="url" type="text" inputmode="url" spellcheck="false"
+             placeholder="Вставь ссылку на видео или пост" aria-label="Ссылка на видео">
+      <span class="detect" id="detect" hidden><i class="dot" id="detectDot"></i><span id="detectLabel"></span></span>
+    </div>
+    <div class="field narrow">
+      <input id="group" type="text" list="groups" maxlength="40" placeholder="Группа" aria-label="Группа">
+    </div>
+    <datalist id="groups"></datalist>
+    <button class="primary" type="submit" id="go">Смотреть</button>
+    <button type="button" id="paste">Вставить</button>
+  </form>
+  <p class="msg" id="msg" role="status"></p>
+
+  <p class="msg error" id="fileWarn" hidden>Страница открыта как файл, поэтому YouTube покажет ошибку 153. Выложи её на сайт (например, на GitHub Pages), и плеер заработает. Ссылка «Открыть на сайте» под плеером работает и так.</p>
+
+  <div class="stage">
+    <div id="player"></div>
+    <div class="now" id="now" hidden>
+      <span class="src"><i class="dot" id="nowDot"></i><span id="nowLabel"></span></span>
+      <a id="nowLink" href="#" target="_blank" rel="noopener noreferrer">Открыть на сайте</a>
+    </div>
+  </div>
+
+  <section id="lib">
+    <h2>Моя библиотека
+      <span class="tools">
+        <button type="button" id="export">Скачать список</button>
+        <button type="button" id="import">Загрузить список</button>
+        <button type="button" id="clear">Очистить</button>
+      </span>
+    </h2>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+    <div class="chips" id="chips" hidden></div>
+    <ul class="history" id="history"></ul>
+    <p class="hint" id="libEmpty">Пока пусто. Каждое открытое видео сохраняется здесь само.</p>
+  </section>
+
+  <p class="hint">Сохраняются ссылки, а не сами видео: они остаются на YouTube, RuTube и в X, и если автор удалит ролик, он пропадёт и здесь. Библиотека хранится в этом браузере. Чтобы перенести её на другое устройство, скачай список и загрузи его там.</p>
+</div>
+
+<script>
+(function () {
+  var KEY = 'videoPlayerHistory.v1';
+  var $ = function (id) { return document.getElementById(id); };
+  var player = $('player'), msg = $('msg'), input = $('url');
+
+  var NAMES = { youtube: 'YouTube', rutube: 'RuTube', x: 'X (Twitter)' };
+  var DOTS = { youtube: 'yt', rutube: 'rt', x: 'x' };
+
+  /* ---------- разбор ссылки ---------- */
+  function parse(raw) {
+    raw = (raw || '').trim();
+    if (!raw) return null;
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) raw = 'https://' + raw;
+    var u;
+    try { u = new URL(raw); } catch (e) { return null; }
+    var host = u.hostname.toLowerCase().replace(/^(www\.|m\.|mobile\.)/, '');
+    var parts = u.pathname.split('/').filter(Boolean);
+    var m;
+
+    // YouTube
+    if (host === 'youtu.be' && parts[0]) {
+      return yt(parts[0], u);
+    }
+    if (host === 'youtube.com' || host === 'music.youtube.com' || host === 'youtube-nocookie.com') {
+      if (parts[0] === 'watch' && u.searchParams.get('v')) return yt(u.searchParams.get('v'), u);
+      if (['shorts', 'embed', 'live', 'v'].indexOf(parts[0]) !== -1 && parts[1]) return yt(parts[1], u);
+      return null;
+    }
+
+    // RuTube
+    if (host === 'rutube.ru') {
+      var id = null, key = u.searchParams.get('p');
+      if (parts[0] === 'video' && parts[1] === 'private' && parts[2]) id = parts[2];
+      else if (parts[0] === 'video' && parts[1]) id = parts[1];
+      else if (parts[0] === 'play' && parts[1] === 'embed' && parts[2]) id = parts[2];
+      else if (parts[0] === 'shorts' && parts[1]) id = parts[1];
+      if (id && /^[a-z0-9]{16,40}$/i.test(id)) {
+        return {
+          type: 'rutube', id: id,
+          embed: 'https://rutube.ru/play/embed/' + id + (key ? '?p=' + encodeURIComponent(key) : ''),
+          page: 'https://rutube.ru/video/' + (key ? 'private/' : '') + id + '/' + (key ? '?p=' + encodeURIComponent(key) : '')
+        };
+      }
+      return null;
+    }
+
+    // X / Twitter
+    if (host === 'x.com' || host === 'twitter.com' || host === 'fixupx.com' || host === 'vxtwitter.com' || host === 'fxtwitter.com') {
+      var si = parts.indexOf('status');
+      if (si === -1) si = parts.indexOf('statuses');
+      if (si !== -1 && /^\d{5,25}$/.test(parts[si + 1] || '')) {
+        var user = parts[0] === 'i' ? 'i' : parts[0];
+        return { type: 'x', id: parts[si + 1], page: 'https://x.com/' + user + '/status/' + parts[si + 1] };
+      }
+      return null;
+    }
+    return null;
+  }
+
+  function yt(id, u) {
+    if (!/^[\w-]{11}$/.test(id)) return null;
+    var start = u.searchParams.get('t') || u.searchParams.get('start') || '';
+    var sec = 0;
+    var tm = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/.exec(start);
+    if (tm) sec = (+tm[1] || 0) * 3600 + (+tm[2] || 0) * 60 + (+tm[3] || 0);
+    return {
+      type: 'youtube', id: id,
+      embed: 'https://www.youtube-nocookie.com/embed/' + id + '?rel=0' + (sec ? '&start=' + sec : ''),
+      page: 'https://www.youtube.com/watch?v=' + id
+    };
+  }
+
+  /* ---------- показ плеера ---------- */
+  var twitterLoading = null;
+  function loadTwitter() {
+    if (window.twttr && window.twttr.widgets) return Promise.resolve(window.twttr);
+    if (twitterLoading) return twitterLoading;
+    twitterLoading = new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = 'https://platform.twitter.com/widgets.js';
+      s.async = true;
+      s.onload = function () {
+        var t = 0;
+        (function wait() {
+          if (window.twttr && window.twttr.widgets) return resolve(window.twttr);
+          if (++t > 50) return reject(new Error('timeout'));
+          setTimeout(wait, 100);
+        })();
+      };
+      s.onerror = function () { twitterLoading = null; reject(new Error('load')); };
+      document.head.appendChild(s);
+    });
+    return twitterLoading;
+  }
+
+  function theme() {
+    var t = document.documentElement.getAttribute('data-theme');
+    if (t) return t;
+    return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  var token = 0;
+  function show(v) {
+    var my = ++token;
+    player.innerHTML = '';
+    if (v.type === 'x') {
+      var box = document.createElement('div');
+      box.className = 'frame tweet';
+      var holder = document.createElement('div');
+      holder.textContent = 'Загружаю пост…';
+      holder.style.color = 'var(--muted)';
+      box.appendChild(holder);
+      player.appendChild(box);
+      loadTwitter().then(function (tw) {
+        if (my !== token) return;
+        holder.textContent = '';
+        return tw.widgets.createTweet(v.id, holder, { theme: theme(), dnt: true, align: 'center' }).then(function (el) {
+          if (my !== token) return;
+          if (!el) holder.textContent = 'Не удалось показать пост. Он удалён, закрыт или автор запретил встраивание.';
+        });
+      }).catch(function () {
+        if (my !== token) return;
+        holder.textContent = 'Не удалось загрузить виджет X. Проверь интернет и блокировщики рекламы.';
+      });
+    } else {
+      var f = document.createElement('div');
+      f.className = 'frame';
+      var ifr = document.createElement('iframe');
+      ifr.src = v.embed;
+      ifr.title = 'Видео ' + NAMES[v.type];
+      ifr.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen';
+      ifr.allowFullscreen = true;
+      ifr.referrerPolicy = 'strict-origin-when-cross-origin';
+      f.appendChild(ifr);
+      player.appendChild(f);
+    }
+    $('now').hidden = false;
+    $('nowLabel').textContent = NAMES[v.type];
+    $('nowDot').className = 'dot ' + DOTS[v.type];
+    $('nowLink').href = v.page;
+  }
+
+  function placeholder() {
+    player.innerHTML = '<div class="empty"><span class="ring"><svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span><p>Вставь ссылку на видео с YouTube, RuTube или из поста в X, и оно откроется здесь.</p></div>';
+  }
+
+  /* ---------- библиотека ---------- */
+  var LIMIT = 500;
+  var activeGroup = null; // null = все, '' = без группы, иначе имя группы
+  function readHist() {
+    try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; }
+  }
+  function writeHist(h) {
+    try { localStorage.setItem(KEY, JSON.stringify(h)); } catch (e) {}
+  }
+  function addHist(v, group) {
+    var h = readHist();
+    var old = h.filter(function (x) { return x.type === v.type && x.id === v.id; })[0];
+    h = h.filter(function (x) { return x !== old; });
+    var g = group ? group : (old ? (old.group || '') : (activeGroup || ''));
+    var item = { type: v.type, id: v.id, page: v.page, title: (old && old.title) || '', group: g, ts: Date.now() };
+    h.unshift(item);
+    writeHist(h.slice(0, LIMIT));
+    renderHist();
+    if (!item.title) fetchTitle(item);
+  }
+  function updateItem(type, id, title, group) {
+    var h = readHist();
+    h.forEach(function (x) {
+      if (x.type === type && x.id === id) { x.title = title; x.group = group; }
+    });
+    writeHist(h);
+    renderHist();
+  }
+  function setTitleIfEmpty(type, id, title) {
+    var h = readHist();
+    h.forEach(function (x) { if (x.type === type && x.id === id && !x.title) x.title = title; });
+    writeHist(h);
+    renderHist();
+  }
+  var titleTried = {};
+  function getJSON(url) {
+    return fetch(url).then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http')); });
+  }
+  // JSONP нужен для X: так запрос проходит без CORS
+  var jsonpN = 0;
+  function jsonp(url) {
+    return new Promise(function (resolve, reject) {
+      var name = '__vp' + (++jsonpN) + '_' + Date.now(), sc = document.createElement('script'), timer;
+      function done() { clearTimeout(timer); window[name] = function () {}; sc.remove(); }
+      window[name] = function (data) { done(); resolve(data); };
+      sc.onerror = function () { done(); reject(new Error('jsonp')); };
+      timer = setTimeout(function () { done(); reject(new Error('timeout')); }, 8000);
+      sc.src = url + (url.indexOf('?') === -1 ? '?' : '&') + 'callback=' + name;
+      document.head.appendChild(sc);
+    });
+  }
+  function xTitle(j) {
+    if (!j || !j.html) return '';
+    var doc = new DOMParser().parseFromString(j.html, 'text/html');
+    var p = doc.querySelector('blockquote p');
+    var text = p ? p.textContent.replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim() : '';
+    if (text.length > 90) text = text.slice(0, 87) + '…';
+    var who = j.author_name || '';
+    return who && text ? who + ': ' + text : (text || who);
+  }
+  function fetchTitle(item) {
+    var k = item.type + ':' + item.id;
+    if (titleTried[k]) return;
+    titleTried[k] = true;
+    var job;
+    if (item.type === 'youtube') {
+      job = getJSON('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(item.page))
+        .then(function (j) { return j.title; });
+    } else if (item.type === 'rutube') {
+      job = getJSON('https://rutube.ru/api/video/' + item.id + '/?format=json')
+        .then(function (j) { return j.title; })
+        .catch(function () {
+          return getJSON('https://rutube.ru/api/oembed/?format=json&url=' + encodeURIComponent(item.page))
+            .then(function (j) { return j.title; });
+        });
+    } else {
+      job = jsonp('https://publish.twitter.com/oembed?omit_script=1&dnt=true&url=' + encodeURIComponent(item.page)).then(xTitle);
+    }
+    job.then(function (t) {
+      t = (t || '').trim();
+      if (t) setTitleIfEmpty(item.type, item.id, t.slice(0, 200));
+    }).catch(function () {});
+  }
+
+  function renderChips(h) {
+    var counts = {}, loose = 0;
+    h.forEach(function (x) { if (x.group) counts[x.group] = (counts[x.group] || 0) + 1; else loose++; });
+    var names = Object.keys(counts).sort(function (a, b) { return a.localeCompare(b, 'ru'); });
+    if (activeGroup && !counts[activeGroup]) activeGroup = null;
+    if (activeGroup === '' && !loose) activeGroup = null;
+
+    var dl = $('groups'); dl.innerHTML = '';
+    names.forEach(function (n) { var o = document.createElement('option'); o.value = n; dl.appendChild(o); });
+
+    var box = $('chips'); box.innerHTML = '';
+    box.hidden = names.length === 0;
+    function chip(label, value) {
+      var c = document.createElement('button');
+      c.type = 'button'; c.className = 'chip'; c.textContent = label;
+      c.setAttribute('aria-pressed', activeGroup === value ? 'true' : 'false');
+      c.addEventListener('click', function () { activeGroup = value; renderHist(); });
+      box.appendChild(c);
+    }
+    chip('Все (' + h.length + ')', null);
+    names.forEach(function (n) { chip(n + ' (' + counts[n] + ')', n); });
+    if (loose) chip('Без группы (' + loose + ')', '');
+  }
+
+  function field(ph, val) {
+    var i = document.createElement('input');
+    i.type = 'text'; i.value = val || ''; i.placeholder = ph; i.setAttribute('aria-label', ph);
+    return i;
+  }
+
+  function renderHist() {
+    var h = readHist(), ul = $('history');
+    renderChips(h);
+    ul.innerHTML = '';
+    $('libEmpty').hidden = h.length > 0;
+    var shown = h.filter(function (x) { return activeGroup === null || (x.group || '') === activeGroup; });
+    shown.forEach(function (x) {
+      var li = document.createElement('li');
+
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'open';
+      var th = document.createElement('span'); th.className = 'thumb';
+      var gl = document.createElement('span'); gl.className = 'glyph';
+      gl.textContent = x.type === 'x' ? 'X' : (x.type === 'rutube' ? 'RuTube' : '▶');
+      th.appendChild(gl);
+      if (x.type === 'youtube') {
+        var im = document.createElement('img');
+        im.loading = 'lazy'; im.alt = '';
+        im.src = 'https://i.ytimg.com/vi/' + x.id + '/mqdefault.jpg';
+        im.addEventListener('error', function () { im.remove(); });
+        th.appendChild(im);
+      }
+      var tag = document.createElement('span'); tag.className = 'tag';
+      var d = document.createElement('i'); d.className = 'dot ' + DOTS[x.type];
+      tag.append(d, document.createTextNode(NAMES[x.type]));
+      th.appendChild(tag);
+      var meta = document.createElement('span'); meta.className = 'meta';
+      var t = document.createElement('span'); t.className = 't';
+      t.textContent = x.title || x.page.replace(/^https?:\/\/(www\.)?/, '');
+      var p = document.createElement('span'); p.className = 'p';
+      p.textContent = (x.group && activeGroup === null) ? x.group : '';
+      meta.append(t, p);
+      b.append(th, meta);
+      b.addEventListener('click', function () { input.value = x.page; play(x.page); window.scrollTo(0, 0); });
+
+      var acts = document.createElement('span'); acts.className = 'acts';
+      var ren = document.createElement('button');
+      ren.type = 'button'; ren.className = 'del'; ren.setAttribute('aria-label', 'Изменить название и группу'); ren.textContent = '✎';
+      ren.addEventListener('click', function () {
+        var row = document.createElement('div'); row.className = 'editrow';
+        var ti = field('Название', x.title), gi = field('Группа', x.group);
+        gi.setAttribute('list', 'groups'); gi.maxLength = 40;
+        var btns = document.createElement('div'); btns.className = 'btns';
+        var ok = document.createElement('button');
+        ok.type = 'button'; ok.className = 'primary'; ok.textContent = 'Готово';
+        var no = document.createElement('button');
+        no.type = 'button'; no.textContent = 'Отмена';
+        function save() { updateItem(x.type, x.id, ti.value.trim().slice(0, 200), gi.value.trim().slice(0, 40)); }
+        function keys(e) {
+          if (e.key === 'Enter') { e.preventDefault(); save(); }
+          if (e.key === 'Escape') renderHist();
+        }
+        ti.addEventListener('keydown', keys); gi.addEventListener('keydown', keys);
+        ok.addEventListener('click', save);
+        no.addEventListener('click', renderHist);
+        btns.append(ok, no);
+        row.append(ti, gi, btns);
+        li.replaceChild(row, b);
+        acts.hidden = true;
+        ti.focus(); ti.select();
+      });
+      var del = document.createElement('button');
+      del.type = 'button'; del.className = 'del'; del.setAttribute('aria-label', 'Убрать из библиотеки'); del.textContent = '✕';
+      del.addEventListener('click', function () {
+        writeHist(readHist().filter(function (y) { return !(y.type === x.type && y.id === x.id); }));
+        renderHist();
+      });
+      acts.append(ren, del);
+      li.append(b, acts);
+      ul.appendChild(li);
+    });
+  }
+
+  /* ---------- действия ---------- */
+  function setMsg(text, err) { msg.textContent = text || ''; msg.className = 'msg' + (err ? ' error' : ''); }
+
+  function updateDetect() {
+    var v = parse(input.value), box = $('detect');
+    if (!v) { box.hidden = true; return; }
+    box.hidden = false;
+    $('detectDot').className = 'dot ' + DOTS[v.type];
+    $('detectLabel').textContent = NAMES[v.type];
+  }
+
+  function play(raw, group) {
+    var v = parse(raw);
+    if (!v) {
+      setMsg('Не получилось распознать ссылку. Подходят ссылки на YouTube, RuTube и посты X со ссылкой вида …/status/123.', true);
+      return;
+    }
+    setMsg('');
+    updateDetect();
+    show(v);
+    addHist(v, group);
+    try { history.replaceState(null, '', '#' + encodeURIComponent(v.page)); } catch (e) {}
+  }
+
+  $('form').addEventListener('submit', function (e) { e.preventDefault(); play(input.value, $('group').value.trim().slice(0, 40)); });
+  $('paste').addEventListener('click', function () {
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      navigator.clipboard.readText().then(function (t) { input.value = t; play(t); }).catch(function () {
+        setMsg('Браузер не дал доступ к буферу обмена. Вставь ссылку вручную.', true); input.focus();
+      });
+    } else { setMsg('Вставь ссылку вручную.', true); input.focus(); }
+  });
+  $('clear').addEventListener('click', function () {
+    if (readHist().length && confirm('Удалить все сохранённые ссылки из библиотеки?')) { writeHist([]); renderHist(); }
+  });
+  $('export').addEventListener('click', function () {
+    var blob = new Blob([JSON.stringify(readHist(), null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'video-library.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  });
+  $('import').addEventListener('click', function () { $('importFile').click(); });
+  $('importFile').addEventListener('change', function () {
+    var f = this.files[0];
+    this.value = '';
+    if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      try {
+        var data = JSON.parse(rd.result);
+        if (!Array.isArray(data)) throw new Error('format');
+        var cur = readHist(), seen = {}, added = 0;
+        cur.forEach(function (x) { seen[x.type + ':' + x.id] = 1; });
+        data.forEach(function (x) {
+          var v = x && x.page ? parse(x.page) : null;
+          if (!v || seen[v.type + ':' + v.id]) return;
+          seen[v.type + ':' + v.id] = 1;
+          cur.push({ type: v.type, id: v.id, page: v.page, title: String(x.title || '').slice(0, 200), group: String(x.group || '').slice(0, 40), ts: +x.ts || 0 });
+          added++;
+        });
+        cur.sort(function (a, b) { return b.ts - a.ts; });
+        writeHist(cur.slice(0, LIMIT));
+        renderHist();
+        setMsg('Добавлено из файла: ' + added + '.');
+      } catch (e) {
+        setMsg('Файл не подошёл. Нужен список, скачанный кнопкой «Скачать список».', true);
+      }
+    };
+    rd.readAsText(f);
+  });
+
+  input.addEventListener('input', updateDetect);
+  if (location.protocol === 'file:') $('fileWarn').hidden = false;
+
+  // ссылка вида page.html#https%3A%2F%2Fyoutu.be%2F... открывает видео сразу
+  var start = '';
+  try { start = decodeURIComponent(location.hash.slice(1)); } catch (e) {}
+  placeholder();
+  renderHist();
+  readHist().filter(function (x) { return !x.title; }).slice(0, 12).forEach(fetchTitle);
+  if (start) { input.value = start; play(start); }
+})();
+</script>
+</body>
+</html>
